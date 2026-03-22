@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bohr Model: H Spectrum</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            background: #050505; color: white; font-family: 'Segoe UI', sans-serif; 
+            margin: 0; padding: 10px; height: 100vh; overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+        
+        .main-layout {
+            display: flex; flex: 1; gap: 20px; width: 100%; max-width: 1600px;
+            margin: 0 auto; overflow: hidden;
+        }
+
+        .guia-didactica {
+            flex: 0 0 320px; background: #111; border: 1px solid #333;
+            border-radius: 10px; padding: 20px; border-top: 4px solid #e67e22;
+            display: flex; flex-direction: column; overflow-y: auto;
+        }
+        .guia-header { color: #e67e22; margin: 0 0 15px 0; font-size: 1.2rem; text-align: center; }
+        .paso-card {
+            background: #1a1a1a; padding: 15px; border-radius: 8px; 
+            border-left: 4px solid #e67e22; margin-bottom: 15px;
+        }
+        .paso-card h3 { margin: 0 0 8px 0; font-size: 1rem; color: #ff9f43; }
+        .paso-card p { margin: 0; font-size: 0.85rem; line-height: 1.4; color: #ccc; }
+
+        .sim-right-col {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: flex-start;
+        }
+
+        h2.sim-title { margin: 0 0 10px 0; font-size: 1.5rem; color: #00fbff; text-align: center; }
+
+        .controls { 
+            margin-bottom: 8px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; 
+        }
+
+        button { 
+            padding: 8px 15px; cursor: pointer; border: none; border-radius: 4px; 
+            color: white; font-weight: bold; font-size: 12px; transition: 0.2s; 
+        }
+        .n3 { background: #ff4444; } .n4 { background: #00fbff; color: #000; } 
+        .n5 { background: #4444ff; } .n6 { background: #a040ff; }
+        .reset { background: #444; border: 1px solid #666; }
+        button:hover { transform: scale(1.05); filter: brightness(1.2); }
+
+        #msg { margin: 5px; font-size: 15px; color: #ffff00; font-weight: bold; height: 20px; text-align: center; }
+
+        .canvas-container {
+            display: flex; align-items: center; justify-content: center;
+            width: 100%; flex: 1;
+        }
+
+        canvas { 
+            background: #000; border: 1px solid #333; border-radius: 8px; 
+            max-height: 100%; width: auto;
+        }
+
+        .licencia-bloque { 
+            margin-top: 10px; color: #666; font-size: 11px; text-align: center; 
+            border-top: 1px solid #222; padding: 8px 0; width: 100%;
+        }
+        .licencia-bloque a { color: #00fbff; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+    <div class="main-layout">
+        <aside class="guia-didactica">
+            <h2 class="guia-header">🚀 Quick Guide: Bohr Atom</h2>
+            
+            <div class="paso-card">
+                <h3>1. Absorption and Excitation</h3>
+                <p>When you press a button, a UV photon hits the electron. Observe how it "jumps" to an outer orbit. The electron can only exist in these quantized orbits.</p>
+            </div>
+            
+            <div class="paso-card">
+                <h3>2. Emission (Balmer Series)</h3>
+                <p>The electron is unstable in higher levels. When it falls to <strong>level n=2</strong>, it emits visible light. The larger the jump, the more energy the photon has (violet light).</p>
+            </div>
+            
+            <div class="paso-card">
+                <h3>3. The Line Spectrum</h3>
+                <p>Look at the detector. Each jump generates an exact line. This "barcode" is unique and proves that energy is <strong>quantized</strong>.</p>
+            </div>
+        </aside>
+
+        <main class="sim-right-col">
+            <h2 class="sim-title">Bohr Model: Visible Spectrum of H (Balmer series)</h2>
+            
+            <div class="controls">
+                <button class="n3" onclick="iniciar(3, '#ff0000', 656)">n=3 → n=2 (Red)</button>
+                <button class="n4" onclick="iniciar(4, '#00fbff', 486)">n=4 → n=2 (Cyan)</button>
+                <button class="n5" onclick="iniciar(5, '#3333ff', 434)">n=5 → n=2 (Blue)</button>
+                <button class="n6" onclick="iniciar(6, '#9d00ff', 410)">n=6 → n=2 (Violet)</button>
+                <button class="reset" onclick="resetSim()">CLEAR SPECTRUM</button>
+            </div>
+
+            <div id="msg">Select a jump to excite the atom...</div>
+            
+            <div class="canvas-container">
+                <canvas id="cvs" width="1000" height="500"></canvas>
+            </div>
+        </main>
+    </div>
+
+    <div class="licencia-bloque">
+        <p>Author: <strong>EAG1964</strong> | 2026 | <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/deed.en" target="_blank">License CC BY-NC-SA 4.0</a></p>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('cvs');
+        const ctx = canvas.getContext('2d');
+        const msg = document.getElementById('msg');
+
+        const niveles = { 1: 35, 2: 70, 3: 110, 4: 140, 5: 165, 6: 190 };
+        const dx = 570, dy = 130, dw = 400, dh = 220; 
+        
+        let e, f, lineasDetectadas;
+
+        function resetSim() {
+            e = { r: niveles[1], ang: 0, estado: 'quieto', colorVis: '', wl: '', x: 0, y: 0 };
+            f = { x: -200, y: 0, active: false, col: '', freq: 0.2, txt: '', vel: 1.5, origenX: 0 };
+            lineasDetectadas = [];
+            msg.innerText = "Electron in ground state (n=1).";
+        }
+
+        function iniciar(nTarget, color, wl) {
+            if (e.estado !== 'quieto') return;
+            e.targetN = nTarget; e.colorVis = color; e.wl = wl;
+            f.active = true; f.x = 0; f.origenX = 0; f.y = e.y;
+            f.col = "#d1d1ff"; f.freq = 0.9; f.txt = "UV ABSORPTION"; f.vel = 1.5;
+            e.estado = 'esperando_uv';
+            msg.innerText = "1. Absorption: The UV photon raises the electron to n=" + nTarget;
+        }
+
+        function drawWave(x, y, col, freq, txt, minX) {
+            ctx.strokeStyle = col; ctx.lineWidth = 2;
+            ctx.beginPath();
+            for (let i = 0; i < 60; i++) {
+                let posX = x - i;
+                if (posX >= minX) ctx.lineTo(posX, y + Math.sin((posX) * freq) * 10);
+            }
+            ctx.stroke();
+            ctx.fillStyle = col; ctx.font = "bold 13px sans-serif";
+            ctx.fillText(txt, x - 50, y - 20);
+        }
+
+        function drawDetector(x, y, w, h) {
+            ctx.strokeStyle = "#444"; ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, w, h);
+            ctx.fillStyle = "white"; ctx.font = "bold 15px sans-serif";
+            ctx.fillText("VISIBLE DETECTOR", x + (w/2) - 70, y - 15);
+            lineasDetectadas.forEach(l => {
+                let xPos = x + w - ((l.wl - 400) / 260 * w);
+                ctx.strokeStyle = l.col; ctx.lineWidth = 5;
+                ctx.beginPath(); ctx.moveTo(xPos, y + 5); ctx.lineTo(xPos, y + h - 5); ctx.stroke();
+                ctx.fillStyle = l.col; ctx.font = "11px sans-serif";
+                ctx.fillText(l.wl + "nm", xPos - 15, y + h + 15);
+            });
+        }
+
+        function animar() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const cx = 270, cy = 205; 
+
+            ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fill();
+
+            ctx.lineWidth = 2;
+            for (let n in niveles) {
+                ctx.beginPath(); ctx.arc(cx, cy, niveles[n], 0, Math.PI * 2);
+                ctx.strokeStyle = (n == 1) ? "#444" : (n == 2 ? "#666" : "#333");
+                if (e.estado === 'subiendo' && n == e.targetN) ctx.strokeStyle = "gold";
+                if (e.estado === 'emitiendo_visible' && n == 2) ctx.strokeStyle = e.colorVis;
+                ctx.stroke();
+                ctx.fillStyle = "#777"; ctx.font = "11px sans-serif";
+                ctx.fillText("n=" + n, cx + niveles[n] + 6, cy + 4);
+            }
+
+            e.x = cx + Math.cos(e.ang) * e.r;
+            e.y = cy + Math.sin(e.ang) * e.r;
+
+            if (f.active) {
+                f.x += f.vel;
+                if (e.estado === 'esperando_uv') f.y = e.y;
+                drawWave(f.x, f.y, f.col, f.freq, f.txt, f.origenX);
+                if (e.estado === 'esperando_uv' && f.x >= e.x) { f.active = false; e.estado = 'subiendo'; }
+                if (e.estado === 'emitiendo_visible' && f.x >= (dx + 10)) {
+                    if (!lineasDetectadas.find(l => l.wl === e.wl)) lineasDetectadas.push({ wl: e.wl, col: e.colorVis });
+                }
+                if (f.x > canvas.width) f.active = false;
+            }
+
+            if (e.estado === 'subiendo') {
+                if (e.r < niveles[e.targetN]) e.r += 1.2;
+                else e.estado = 'cayendo_visible';
+            }
+            if (e.estado === 'cayendo_visible') {
+                if (e.r > niveles[2]) e.r -= 0.9;
+                else {
+                    e.estado = 'emitiendo_visible';
+                    f.active = true; f.origenX = e.x; f.x = e.x; f.y = e.y;
+                    f.col = e.colorVis; f.freq = 0.35; f.txt = "PHOTON " + e.wl + "nm"; f.vel = 1.5;
+                }
+            }
+            if (e.estado === 'emitiendo_visible' && !f.active) e.estado = 'cayendo_suelo';
+            if (e.estado === 'cayendo_suelo') {
+                if (e.r > niveles[1]) e.r -= 0.9;
+                else {
+                    e.estado = 'emitiendo_uv_final';
+                    f.active = true; f.origenX = e.x; f.x = e.x; f.y = e.y;
+                    f.col = "#ffffff"; f.freq = 1.1; f.txt = "UV EMISSION"; f.vel = 1.5;
+                }
+            }
+            if (e.estado === 'emitiendo_uv_final' && !f.active) e.estado = 'quieto';
+
+            if (['quieto', 'esperando_uv', 'emitiendo_visible', 'emitiendo_uv_final'].includes(e.estado)) e.ang += 0.012;
+            ctx.fillStyle = "#ffff00"; ctx.beginPath(); ctx.arc(e.x, e.y, 5, 0, Math.PI*2); ctx.fill();
+
+            drawDetector(dx, dy, dw, dh);
+            requestAnimationFrame(animar);
+        }
+
+        resetSim();
+        animar();
+    </script>
+</body>
+</html>
